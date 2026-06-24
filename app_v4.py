@@ -10,7 +10,7 @@ st.set_page_config(page_title="قارئ درجات الطلاب الصوتي - V
 st.title("🎙️ تطبيق قارئ الدرجات الصوتي (النسخة الاحترافية V4)")
 st.write("تمت ترقية محرك الصوت بالكامل لدعم اختيار صوت (رجل أو امرأة) والتحكم الدقيق في السرعة عبر زر مخصص.")
 
-# دالة لتوليد الصوت باستخدام ميكروسوفت إيدج عبر edge-tts (يدعم تغيير الصوت والسرعة بدقة)
+# دالة لتوليد الصوت باستخدام ميكروسوفت إيدج عبر edge-tts
 async def text_to_speech_edge(text, voice, rate_str):
     communicate = edge_tts.Communicate(text, voice, rate=rate_str)
     audio_buffer = io.BytesIO()
@@ -35,17 +35,14 @@ if uploaded_file is not None:
     # 👩‍💼 👨‍💼 اختيار نوع الصوت (رجل أو امرأة)
     gender = st.sidebar.radio("👤 نوع صوت المساعد:", ["امرأة (صوت نقي)", "رجل (صوت وقور)"])
     
-    # اختيار المعرف الخاص بالصوت بناءً على رغبة المستخدم
-    # استخدام أصوات عربية عالية الجودة (Neural Voices)
     if gender == "رجل (صوت وقور)":
-        voice_id = "ar-SA-HamedNeural"  # صوت رجل سعودي طبيعي جداً
+        voice_id = "ar-SA-HamedNeural"  # صوت رجل سعودي طبيعي
     else:
-        voice_id = "ar-EG-HodaNeural"   # صوت امرأة مصري طبيعي جداً نقياً
+        voice_id = "ar-EG-HodaNeural"   # صوت امرأة مصري طبيعي ونقي
         
-    # 🏃‍♂️ زر/منزلق مخصص للتحكم في السرعة بدقة
+    # 🏃‍♂️ زر مخصص للتحكم في السرعة بدقة
     speed_percent = st.sidebar.slider("⏱️ سرعة النطق (%):", min_value=50, max_value=150, value=100, step=10)
     
-    # تحويل الرقم إلى الصيغة التي يفهمها محرك الصوت (مثال: +10% أو -20%)
     diff = speed_percent - 100
     rate_str = f"{diff:+}%" if diff != 0 else "+0%"
     
@@ -53,7 +50,7 @@ if uploaded_file is not None:
     name_col = st.sidebar.selectbox("اختر عمود أسماء الطلاب:", columns, index=0)
     remaining_cols = [col for col in columns if col != name_col]
     
-    # تقسيم تلقائي ذكي
+    # تقسيم تلقائي ذكي للأعمدة
     default_saai = [c for c in remaining_cols if "سعي" in str(c).lower() or "يومي" in str(c).lower()]
     default_exam = [c for c in remaining_cols if "امتحان" in str(c).lower() or "فاينل" in str(c).lower()]
     default_final = [c for c in remaining_cols if "نهائي" in str(c).lower() or "مجموع" in str(c).lower()]
@@ -82,7 +79,6 @@ if uploaded_file is not None:
         st.markdown(f"### 🗂️ الطالب الحالي: {current_idx + 1} من {total_students}")
         st.info(f"👤 **اسم الطالب:** {student_name}")
         
-        # بناء نص النطق (أرقام فقط بعد الاسم)
         speech_text = f"الطالب: {student_name}. "
         
         st.markdown("#### 📊 الترتيب الحالي للنطق:")
@@ -109,14 +105,12 @@ if uploaded_file is not None:
         process_grades(exam_selection, "🔸 درجات الامتحان (ثانياً)")
         process_grades(final_selection, "✅ الدرجة النهائية (أخيراً)")
         
-        # توليد الصوت الذكي بنظام الأسنك (Async) المتوافق مع ميكروسوفت
         with st.spinner("جاري تحضير الصوت بالصيغة المختارة..."):
             try:
-                # تشغيل الدالة غير المتزامنة لإنشاء الصوت
                 audio_data = asyncio.run(text_to_speech_edge(speech_text, voice_id, rate_str))
                 st.audio(audio_data, format="audio/mp3", autoplay=True)
             except Exception as e:
-                st.error(f"حدث خطأ أثناء توليد الصوت: {e}. تأكد من اتصالك بالإنترنت.")
+                st.error(f"حدث خطأ أثناء توليد الصوت. تأكد من اتصالك بالإنترنت.")
         
         st.divider()
         
@@ -133,5 +127,6 @@ if uploaded_file is not None:
                 st.session_state.student_index += 1
                 st.rerun()
 
-st.sidebar.markdown("---")
-st.sidebar.info(f"ℹ️ **معلومات الصوت الحالية:**\n- المحرك: Microsoft Neural\n- السرعة المحددة: {speed_percent}%\n- نوع النطق: {gender}")
+    # التعديل هنا: تم إدخال هذين السطرين تحت نطاق الـ if الخاصة بالملف (بإضافة 4 مسافات بادئة)
+    st.sidebar.markdown("---")
+    st.sidebar.info(f"ℹ️ **معلومات الصوت الحالية:**\n- المحرك: Microsoft Neural\n- السرعة المحددة: {speed_percent}%\n- نوع النطق: {gender}")
