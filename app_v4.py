@@ -5,10 +5,10 @@ import asyncio
 import io
 
 # إعدادات الصفحة
-st.set_page_config(page_title="قارئ درجات الطلاب الصوتي - V5", layout="centered", page_icon="🎙️")
+st.set_page_config(page_title="قارئ درجات الطلاب الصوتي - V6", layout="centered", page_icon="🎙️")
 
-st.title("🎙️ تطبيق قارئ الدرجات الصوتي (النسخة V5 المعالجة للملفات)")
-st.write("تمت إضافة ميزة تخطي الأسطر الفارغة وتحديد سطر العناوين لحل مشاكل تنسيق الملفات.")
+st.title("🎙️ تطبيق قارئ الدرجات الصوتي (النسخة V6 الذكية)")
+st.write("تم تحديث التطبيق ليدعم الجداول المزدوجة والخلايا المدمجة للمواد تلقائياً وبذكاء.")
 
 # دالة لتوليد الصوت باستخدام ميكروسوفت إيدج
 async def text_to_speech_edge(text, voice, rate_str):
@@ -24,51 +24,76 @@ async def text_to_speech_edge(text, voice, rate_str):
 uploaded_file = st.file_uploader("اختر ملف إكسيل (xlsx)", type=["xlsx"])
 
 if uploaded_file is not None:
+    # قراءة الملف بدون عناوين أولاً لتحليله ذكياً واكتشاف العناوين المدمجة
+    df_raw = pd.read_excel(uploaded_file, header=None)
     
-    # ⚙️ إعدادات التحكم المتقدمة في أعلى القائمة الجانبية
-    st.sidebar.header("⚙️ إعدادات قراءة الملف والصوت")
+    # البحث عن السطر الذي يحتوي على الكلمات المفتاحية للدرجات
+    keywords = ['سعي', 'امتحان', 'نهائي', 'يومي', 'فاينل', 'مجموع', 'درجة']
+    subheader_idx = None
+    for idx, row in df_raw.head(5).iterrows():
+        if any(any(kw in str(cell).lower() for kw in keywords) for cell in row if pd.notna(cell)):
+            subheader_idx = idx
+            break
     
-    # ميزة ذكية لتحديد سطر العناوين إذا كان هناك جدول علوي أو خلايا مدمجة
-    header_row = st.sidebar.number_input(
-        "📍 سطر أسماء الأعمدة في ملفك (ابدأ بـ 0):", 
-        min_value=0, 
-        value=0, 
-        help="إذا كان لديك عنوان كبير في أول سطر بالإكسيل، غير هذا الرقم إلى 1 أو 2 حتى تظهر أسماء الأعمدة بشكل صحيح."
-    )
-    
-    # قراءة الملف بناءً على السطر المحدد
-    df = pd.read_excel(uploaded_file, header=header_row)
-    
-    # تنظيف البيانات: حذف الأعمدة والأسطر التي تكون فارغة تماماً
+    # بناء أسماء الأعمدة ذكياً عبر دمج اسم المادة مع نوع الدرجة
+    if subheader_idx is not None and subheader_idx > 0:
+        main_header = df_raw.iloc[subheader_idx - 1].ffill().fillna('').astype(str)
+        sub_header = df_raw.iloc[subheader_idx].fillna('').astype(str)
+        
+        new_columns = []
+        for m, s in zip(main_header, sub_header):
+            m_clean = m.strip()
+            s_clean = s.strip()
+            
+            if 'اسم' in m_clean.lower() or m_clean == 'الاسم':
+                new_columns.append("الاسم")
+            elif m_clean == s_clean or s_clean == '':
+                new_columns.append(m_clean)
+            elif m_clean == '':
+                new_columns.append(s_clean)
+            else:
+                new_columns.append(f"{m_clean} - {s_clean}")
+        
+        # قطع البيانات الحقيقية للطلاب من بعد سطر العناوين الفرعية
+        df = df_raw.iloc[subheader_idx + 1:].copy()
+        df.columns = new_columns
+    else:
+        df = pd.read_excel(uploaded_file, header=0)
+        
+    # تنظيف البيانات من الأسطر الفارغة تماماً
     df = df.dropna(how='all')
-    
     columns = df.columns.tolist()
     
-    # 👩‍💼 👨‍💼 اختيار نوع الصوت
+    # واجهة التحكم الجانبية لخيارات الصوت
+    st.sidebar.header("⚙️ إعدادات الصوت والتحكم")
     gender = st.sidebar.radio("👤 نوع صوت المساعد:", ["امرأة (صوت نقي)", "رجل (صوت وقور)"])
     voice_id = "ar-SA-HamedNeural" if gender == "رجل (صوت وقور)" else "ar-EG-HodaNeural"
-        
-    # 🏃‍♂️ التحكم في السرعة
+    
     speed_percent = st.sidebar.slider("⏱️ سرعة النطق (%):", min_value=50, max_value=150, value=100, step=10)
     diff = speed_percent - 100
     rate_str = f"{diff:+}%" if diff != 0 else "+0%"
     
     st.sidebar.markdown("---")
     
-    # تحديد عمود الأسماء وحذف الأسطر التي ليس فيها اسم طالب (لتجنب ظهور nan)
-    name_col = st.sidebar.selectbox("اختر عمود أسماء الطلاب:", columns, index=0)
+    # التحديد التلقائي الذكي لعمود الأسماء
+    if "الاسم" in columns:
+        name_idx = columns.index("الاسم")
+    else:
+        name_idx = 0
+        
+    name_col = st.sidebar.selectbox("اختر عمود أسماء الطلاب:", columns, index=name_idx)
     df = df.dropna(subset=[name_col])
     
-    remaining_cols = [col for col in columns if col != name_col and not str(col).startswith('Unnamed:')]
+    remaining_cols = [col for col in columns if col != name_col]
     
-    # تقسيم تلقائي ذكي للأعمدة
-    default_saai = [c for c in remaining_cols if "سعي" in str(c).lower() or "يومي" in str(c).lower()]
-    default_exam = [c for c in remaining_cols if "امتحان" in str(c).lower() or "فاينل" in str(c).lower()]
-    default_final = [c for c in remaining_cols if "نهائي" in str(c).lower() or "مجموع" in str(c).lower()]
+    # تقسيم تلقائي ذكي جداً بناءً على المسميات المدمجة الجديدة
+    default_saai = [c for c in remaining_cols if "سعي" in str(c) or "يومي" in str(c)]
+    default_exam = [c for c in remaining_cols if "امتحان" in str(c) or "فاينل" in str(c)]
+    default_final = [c for c in remaining_cols if "نهائي" in str(c) or "مجموع" in str(c)]
     
-    saai_selection = st.sidebar.multiselect("1️⃣ أعمدة السعيات (تظهر كأعمدة):", remaining_cols, default=default_saai)
-    exam_selection = st.sidebar.multiselect("2️⃣ أعمدة الامتحانات (تظهر كأعمدة):", remaining_cols, default=default_exam)
-    final_selection = st.sidebar.multiselect("3️⃣ أعمدة الدرجات النهائية (تظهر كأعمدة):", remaining_cols, default=default_final)
+    saai_selection = st.sidebar.multiselect("1️⃣ أعمدة السعيات المكتشفة:", remaining_cols, default=default_saai)
+    exam_selection = st.sidebar.multiselect("2️⃣ أعمدة الامتحانات المكتشفة:", remaining_cols, default=default_exam)
+    final_selection = st.sidebar.multiselect("3️⃣ أعمدة الدرجات النهائية المكتشفة:", remaining_cols, default=default_final)
     
     if 'student_index' not in st.session_state:
         st.session_state.student_index = 0
@@ -76,7 +101,7 @@ if uploaded_file is not None:
     total_students = len(df)
     
     if total_students == 0:
-        st.warning("لم يتم العثور على بيانات طلاب في هذا السطر. يرجى تعديل 'سطر أسماء الأعمدة' من القائمة الجانبية.")
+        st.warning("لم يتم العثور على أسطر بيانات طلاب صالحة.")
     else:
         if st.session_state.student_index >= total_students:
             st.session_state.student_index = total_students - 1
@@ -120,7 +145,7 @@ if uploaded_file is not None:
                 audio_data = asyncio.run(text_to_speech_edge(speech_text, voice_id, rate_str))
                 st.audio(audio_data, format="audio/mp3", autoplay=True)
             except Exception as e:
-                st.error(f"حدث خطأ في الاتصال.")
+                st.error("حدث خطأ أثناء توليد الصوت، يرجى التحقق من الإنترنت.")
         
         st.divider()
         
@@ -138,4 +163,4 @@ if uploaded_file is not None:
                 st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.info(f"ℹ️ السرعة الحالية: {speed_percent}% | الصوت: {gender}")
+    st.sidebar.info(f"ℹ️ السرعة: {speed_percent}% | الصوت المختار: {gender}")
