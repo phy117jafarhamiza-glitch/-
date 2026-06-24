@@ -5,10 +5,10 @@ import asyncio
 import io
 
 # إعدادات الصفحة
-st.set_page_config(page_title="قارئ درجات الطلاب الصوتي - V6", layout="centered", page_icon="🎙️")
+st.set_page_config(page_title="قارئ درجات الطلاب الصوتي - V6.1", layout="centered", page_icon="🎙️")
 
-st.title("🎙️ تطبيق قارئ الدرجات الصوتي (النسخة V6 الذكية)")
-st.write("تم تحديث التطبيق ليدعم الجداول المزدوجة والخلايا المدمجة للمواد تلقائياً وبذكاء.")
+st.title("🎙️ تطبيق قارئ الدرجات الصوتي (النسخة V6.1 الذكية)")
+st.write("تم تحديث الكود لإصلاح مشكلة صوت المساعد النسائي وتأكيد عمله بنجاح.")
 
 # دالة لتوليد الصوت باستخدام ميكروسوفت إيدج
 async def text_to_speech_edge(text, voice, rate_str):
@@ -67,7 +67,9 @@ if uploaded_file is not None:
     # واجهة التحكم الجانبية لخيارات الصوت
     st.sidebar.header("⚙️ إعدادات الصوت والتحكم")
     gender = st.sidebar.radio("👤 نوع صوت المساعد:", ["امرأة (صوت نقي)", "رجل (صوت وقور)"])
-    voice_id = "ar-SA-HamedNeural" if gender == "رجل (صوت وقور)" else "ar-EG-HodaNeural"
+    
+    # تعديل محرك الصوت هنا لضمان عمل صوت المرأة (Salma)
+    voice_id = "ar-SA-HamedNeural" if gender == "رجل (صوت وقور)" else "ar-EG-SalmaNeural"
     
     speed_percent = st.sidebar.slider("⏱️ سرعة النطق (%):", min_value=50, max_value=150, value=100, step=10)
     diff = speed_percent - 100
